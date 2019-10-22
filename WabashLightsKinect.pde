@@ -13,14 +13,18 @@ Kinect2 kinect2;
 // Angle for rotation
 float a = 3.1;
 
-color near = color (255, 255, 255);
-color mid = color(255, 0, 255);
-color far = color(0, 0, 64);
 
-float nearThreshold = 600;
-float midThreshold = 1000;
-float farThreshold = 2000;
+color[] colors = {
+  color(255, 255, 255), 
+  color(255, 255, 0),
+  color(255, 0, 255), 
+  color(128, 0, 0),
+  color(0, 64, 64), 
+  color(0, 0, 64)
+};
 
+float lowerThreshold = 600;
+float upperThreshold = 3000;
 
 void setup() {
 
@@ -32,12 +36,12 @@ void setup() {
   kinect2.initDevice();
 
   smooth(16);
-  strokeWeight(5);
+  strokeWeight(4);
 }
 
 
 void draw() {
-  background(far);
+  background(colors[colors.length - 1]);
   // Translate and rotate
   pushMatrix();
   translate(width/2, height/2, 50);
@@ -48,23 +52,15 @@ void draw() {
 
   // Get the raw depth as array of integers
   int[] depth = kinect2.getRawDepth();
-  
+
   beginShape(POINTS);
   for (int x = 0; x < kinect2.depthWidth; x+=skip) {
     for (int y = 0; y < kinect2.depthHeight; y+=skip) {
-      int offset = x + y * kinect2.depthWidth;
-      int z = depth[offset];
-      float lerpValue;
-      if (z > farThreshold) {
-        continue;
-      } else if ( z > midThreshold) {
-        lerpValue = (z - midThreshold) / (farThreshold - midThreshold);
-        stroke(lerpColor(mid, far, lerpValue));
-      } else {
-        lerpValue = (z - nearThreshold) / (midThreshold - nearThreshold);
-        stroke(lerpColor(near, mid, lerpValue));
-      }
-
+      int offset = (kinect2.depthWidth - x) + y * kinect2.depthWidth;
+      int z = depth[offset]; 
+      
+      stroke(colorPhase(z));
+      
       //calculte the x, y, z camera position based on the depth information
       PVector point = depthToPointCloudPos(x, y, z);
 
@@ -73,14 +69,29 @@ void draw() {
     }
   }
   endShape();
- 
-  popMatrix();
 
-  fill(255, 0, 0);
-  text(frameRate, 50, 50);
+  popMatrix();
 
   // Rotate
   //a += 0.0015f;
+}
+
+// Lerp between different colors based on distance
+color colorPhase(float zValue) {
+  color phaseColor = colors[0];
+  float increment = (upperThreshold - lowerThreshold) / colors.length;
+  for (int i = 0; i < colors.length; i ++) {
+    float currentThreshold = lowerThreshold + i * increment;
+    float nextThreshold = lowerThreshold + (i + 1) * increment;
+    if (zValue > currentThreshold) {
+      int lowIndex = Math.max(i - 1, 0);
+      float lerpValue = (zValue - currentThreshold) / (nextThreshold - currentThreshold);
+      color nextIndex = Math.min(i + 1, colors.length - 1);
+      phaseColor = lerpColor(colors[i], colors[nextIndex], lerpValue);
+    }
+  }   
+
+  return phaseColor;
 }
 
 //calculte the xyz camera position based on the depth data
