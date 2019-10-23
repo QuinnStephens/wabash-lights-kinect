@@ -14,7 +14,7 @@ Kinect2 kinect2;
 float a = 3.1;
 
 
-color[] colors = {
+color[] colorPhases = {
   color(255, 255, 255), 
   color(255, 255, 0),
   color(255, 0, 255), 
@@ -22,6 +22,17 @@ color[] colors = {
   color(0, 64, 64), 
   color(0, 0, 64)
 };
+
+color[] alternateColorPhases = {
+  color(255, 255, 255), 
+  color(255, 0, 255),
+  color(255, 0, 0), 
+  color(255, 255, 0),
+  color(64, 0, 64), 
+  color(0, 0, 64)
+};
+
+float frequency = 0.3;
 
 float lowerThreshold = 600;
 float upperThreshold = 3000;
@@ -41,7 +52,6 @@ void setup() {
 
 
 void draw() {
-  background(colors[colors.length - 1]);
   // Translate and rotate
   pushMatrix();
   translate(width/2, height/2, 50);
@@ -52,6 +62,15 @@ void draw() {
 
   // Get the raw depth as array of integers
   int[] depth = kinect2.getRawDepth();
+  
+  // Offset colors for this frame
+  float sineValue = (sin(frequency * millis() * 0.01) + 1) / 2;
+  ArrayList<Integer> colors = new ArrayList<Integer>();
+  for (int i = 0; i < colorPhases.length - 1; i ++){
+    colors.add(lerpColor(colorPhases[i], alternateColorPhases[i], sineValue));
+  }
+  background(colorPhases[colorPhases.length - 1]);
+  
 
   beginShape(POINTS);
   for (int x = 0; x < kinect2.depthWidth; x+=skip) {
@@ -59,7 +78,8 @@ void draw() {
       int offset = (kinect2.depthWidth - x) + y * kinect2.depthWidth;
       int z = depth[offset]; 
       
-      stroke(colorPhase(z));
+      color phasedColor = colorPhase(z, colors);
+      stroke(phasedColor);
       
       //calculte the x, y, z camera position based on the depth information
       PVector point = depthToPointCloudPos(x, y, z);
@@ -77,17 +97,17 @@ void draw() {
 }
 
 // Lerp between different colors based on distance
-color colorPhase(float zValue) {
-  color phaseColor = colors[0];
-  float increment = (upperThreshold - lowerThreshold) / colors.length;
-  for (int i = 0; i < colors.length; i ++) {
+color colorPhase(float zValue, ArrayList<Integer> colors) {
+  color phaseColor = colors.get(0);
+  float increment = (upperThreshold - lowerThreshold) / colors.size();
+  for (int i = 0; i < colors.size(); i ++) {
     float currentThreshold = lowerThreshold + i * increment;
     float nextThreshold = lowerThreshold + (i + 1) * increment;
     if (zValue > currentThreshold) {
       int lowIndex = Math.max(i - 1, 0);
       float lerpValue = (zValue - currentThreshold) / (nextThreshold - currentThreshold);
-      color nextIndex = Math.min(i + 1, colors.length - 1);
-      phaseColor = lerpColor(colors[i], colors[nextIndex], lerpValue);
+      color nextIndex = Math.min(i + 1, colors.size() - 1);
+      phaseColor = lerpColor(colors.get(i), colors.get(nextIndex), lerpValue);
     }
   }   
 
